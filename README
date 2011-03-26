@@ -1,0 +1,24 @@
+JsonRpc-Netstrings
+========
+
+Description
+-----------
+
+JsonRpc-Netstrings is a Lightweight json-rpc library for building TCP (Netstring) clients.
+
+Installation
+------------
+
+Prerequisites:
+
+ * Python (Tested on 2.6)
+
+Usage
+-----
+
+Coming soon... maybe.
+
+See Also
+-----
+txJsonRpc-Netstrings for building high concurrency servers on top of Twisted Python.
+

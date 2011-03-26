@@ -1,0 +1,4 @@
+*.pyc
+JsonRpc_Netstrings.egg-info
+build
+dist
