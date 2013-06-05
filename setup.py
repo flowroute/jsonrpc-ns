@@ -2,7 +2,7 @@
 
 from setuptools import setup
 setup(
-    name='JsonRpc-Netstrings',
+    name='jsonrpc-ns',
     version='0.1-dev',
     description='Lightweight json-rpc library for building TCP (Netstring) clients -- see txJsonRpc-Netstrings for building servers.',
     author='TelTech Systems',
