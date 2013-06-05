@@ -4,23 +4,18 @@ import traceback
 import logging
 
 
-
-
-class ConnectionLost(Exception):
-    pass
-
-
 class JSONRPCError(Exception):
     pass
 
 
 class JSONRPCProxy:
 
-    def __init__(self, host, port, version="2.0"):
+    def __init__(self, host, port, version="2.0", connect_timeout=60):
         self.host = host
         self.port = port
         self.version = version
         self._id = 1
+        self.timeout = connect_timeout
         self.connect()
 
     @property
@@ -28,9 +23,9 @@ class JSONRPCProxy:
         self._id += 1
         return self._id
 
-    def connect(self, timeout=60):
+    def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.settimeout(timeout)
+        self.socket.settimeout(self.timeout)
         self.socket.connect((self.host, self.port))
 
     def close(self):
@@ -55,24 +50,30 @@ class JSONRPCProxy:
         else:
             return (rpcid, netstring)
 
-    def request(self, method, params={}, retry=0):
-        if retry < 0:
-            raise JSONRPCError("Retries exceeded. Request failed.")
+    def request(self, method, params={}, retry=1):
+
+        def do_retry(retry):
+            retry -= 1
+            if retry < 0:
+                raise JSONRPCError("Retries exceeded. Request failed.")
+
+            self.close()
+            try:
+                self.connect()
+            except Exception:
+                traceback_string = traceback.format_exc()
+                logging.error(traceback_string)
+            return self.request(method, params, retry-1)
 
         try:
             rpcid, netstring = self._msg(method, params)
 
-            try:
-                self.socket.sendall(netstring)
-            except Exception:
-                self.close()
-                raise ConnectionLost("Failed to send.")
+            self.socket.sendall(netstring)
 
             byte_length = self.socket.recv(1, socket.MSG_WAITALL)
 
             if not byte_length:
-                self.close()
-                raise ConnectionLost("No data recieved")
+                return do_retry(retry)
 
             while byte_length[-1] != ':':
                 byte_length += self.socket.recv(1)
@@ -86,20 +87,19 @@ class JSONRPCProxy:
                 response_string += str(self.socket.recv(remainder))
                 response_len = len(response_string)
             response = json.loads(response_string)
-        except ConnectionLost as e:
-            raise e
         except Exception:
             # Get the traceback
             traceback_string = traceback.format_exc()
             logging.error(traceback_string)
-            return self.request(method, params, retry-1)
+            return do_retry(retry)
 
         if not 'jsonrpc' in response:
-            raise JSONRPCError("Missing 'version'")
+            raise JSONRPCError("Missing 'jsonrpc' version")
 
         if response['jsonrpc'] != self.version:
-            raise JSONRPCError("Bad version. Got {}, expects {}".format(
-                response['version'], self.version))
+            raise JSONRPCError(
+                "Bad jsonrpc version. Got {}, expects {}".format(
+                    response['jsonrpc'], self.version))
 
         if not 'id' in response:
             raise JSONRPCError("Missing 'id'")
@@ -125,4 +125,9 @@ class JSONRPCProxy:
             self.socket.sendall(netstring)
         except Exception:
             self.close()
-            raise ConnectionLost("Failed to send.")
+            try:
+                # Retry once
+                self.connect()
+                self.socket.sendall(netstring)
+            except Exception:
+                raise JSONRPCError("Failed to send.")
