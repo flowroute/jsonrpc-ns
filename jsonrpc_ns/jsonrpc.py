@@ -1,6 +1,9 @@
 import socket
 import json
 import traceback
+import logging
+
+
 
 
 class ConnectionLost(Exception):
@@ -83,10 +86,12 @@ class JSONRPCProxy:
                 response_string += str(self.socket.recv(remainder))
                 response_len = len(response_string)
             response = json.loads(response_string)
+        except ConnectionLost as e:
+            raise e
         except Exception:
             # Get the traceback
             traceback_string = traceback.format_exc()
-            print traceback_string
+            logging.error(traceback_string)
             return self.request(method, params, retry-1)
 
         if not 'jsonrpc' in response:
