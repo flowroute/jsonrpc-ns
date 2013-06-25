@@ -16,6 +16,13 @@ class JSONRPCRequestFailure(JSONRPCError):
     pass
 
 
+class JSONRPCResponseError(JSONRPCError):
+    """
+    JSONRPCResponseError contains a dictionary with a code and a message
+    """
+    pass
+
+
 class JSONRPCProxy:
 
     def __init__(self, host, port, version="2.0", connect_timeout=60):
@@ -123,7 +130,16 @@ class JSONRPCProxy:
         if 'result' in response:
             return response['result']
         elif 'error' in response:
-            raise JSONRPCError(response['error'])
+            error = response['error']
+            if 'code' not in error:
+                raise JSONRPCBadResponse('error response missing code.'
+                                         'Response: {}'
+                                         .format(response))
+            elif 'message' not in error:
+                raise JSONRPCBadResponse('error response missing message.'
+                                         'Response: {}'
+                                         .format(response))
+            raise JSONRPCResponseError(response['error'])
         else:
             raise JSONRPCBadResponse('Unknown error. Response: {}'
                                      .format(response))
@@ -139,4 +155,4 @@ class JSONRPCProxy:
                 self.connect()
                 self.socket.sendall(netstring)
             except Exception:
-                raise JSONRPCError("Failed to send.")
+                raise JSONRPCRequestFailure("Failed to send.")
