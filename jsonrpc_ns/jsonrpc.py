@@ -20,6 +20,8 @@ class JSONRPCProxy:
 
     @property
     def _rpcid(self):
+        if self._id > 1000000:
+            self._id = 0
         self._id += 1
         return self._id
 
