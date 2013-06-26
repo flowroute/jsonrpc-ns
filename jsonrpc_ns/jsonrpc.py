@@ -21,15 +21,15 @@ class JSONRPCRequestFailure(JSONRPCError):
 
 
 class JSONRPCResponseError(JSONRPCError):
-    """
+    '''
     JSONRPCResponseError contains a dictionary with a code and a message
-    """
+    '''
     pass
 
 
 class JSONRPCProxy:
 
-    def __init__(self, host, port, version="2.0", connect_timeout=60):
+    def __init__(self, host, port, version='2.0', connect_timeout=60):
         self.host = host
         self.port = port
         self.version = version
@@ -54,9 +54,9 @@ class JSONRPCProxy:
 
     def _msg(self, method, params={}, notify=False):
         jsonrpc = {
-            "jsonrpc": self.version,
-            "method": method,
-            "params": params
+            'jsonrpc': self.version,
+            'method': method,
+            'params': params
         }
 
         if notify is not True:
@@ -64,7 +64,7 @@ class JSONRPCProxy:
             jsonrpc['id'] = rpcid
 
         string = json.dumps(jsonrpc)
-        netstring = str(len(string)) + ":" + string + ","
+        netstring = str(len(string)) + ':' + string + ','
 
         if notify:
             return netstring
@@ -76,7 +76,7 @@ class JSONRPCProxy:
         def do_retry(retry):
             retry -= 1
             if retry < 0:
-                raise JSONRPCRequestFailure("Retries exceeded.")
+                raise JSONRPCRequestFailure('Retries exceeded.')
 
             self.close()
             try:
@@ -119,7 +119,7 @@ class JSONRPCProxy:
 
         if response['jsonrpc'] != self.version:
             raise JSONRPCBadResponse(
-                "Bad jsonrpc version. Got {}, expects {}".format(
+                'Bad jsonrpc version. Got {}, expects {}'.format(
                     response['jsonrpc'], self.version))
 
         if not 'id' in response:
@@ -127,15 +127,15 @@ class JSONRPCProxy:
 
         if response['id'] != rpcid:
             logging.error(
-                "Wrong response id. Got {}, expects {}."
-                "Retrying...".format(
+                'Wrong response id. Got {}, expects {}.'
+                'Retrying...'.format(
                 response['id'], self.rpcid))
             return self.request(method, params, retry-1)
 
         last_char = self.socket.recv(1)
 
         if last_char != ',':
-            raise JSONRPCBadResponse("Bad netstring: missing comma")
+            raise JSONRPCBadResponse('Bad netstring: missing comma')
 
         if 'result' in response:
             return response['result']
@@ -165,4 +165,4 @@ class JSONRPCProxy:
                 self.connect()
                 self.socket.sendall(netstring)
             except Exception:
-                raise JSONRPCRequestFailure("Failed to send.")
+                raise JSONRPCRequestFailure('Failed to send.')

@@ -31,13 +31,13 @@ class BadSocket:
 
 
 class JSONRPCHandler(socketserver.BaseRequestHandler):
-    """
+    '''
     The RequestHandler class for our server.
 
     It is instantiated once per connection to the server, and must
     override the handle() method to implement communication to the
     client.
-    """
+    '''
 
     def handle(self):
         # self.request is the TCP socket connected to the client
@@ -50,7 +50,7 @@ class JSONRPCHandler(socketserver.BaseRequestHandler):
         # these values can be overridden
         is_error = False
         missing_comma = False
-        version = "2.0"
+        version = '2.0'
         try:
             data = json.loads(jsdata)
         except:
@@ -71,7 +71,7 @@ class JSONRPCHandler(socketserver.BaseRequestHandler):
             version = None
             result = 'fail'
         elif method == 'test_bad_version':
-            version = "9000"
+            version = '9000'
             result = 'fail'
         elif method == 'test_no_version_error':
             version = None
@@ -151,11 +151,11 @@ class TestJSONRPC:
 
     @classmethod
     def setup_class(cls):
-        print ("setup_class() before any methods in this class")
+        print ('setup_class() before any methods in this class')
 
     @classmethod
     def teardown_class(cls):
-        print ("teardown_class() after any methods in this class")
+        print ('teardown_class() after any methods in this class')
 
     def assertException(self, name, _e, _str, notify=False):
         try:
@@ -178,7 +178,7 @@ class TestJSONRPC:
 
     def test_request_fail(self):
         self.assertException('test_request_fail', JSONRPCRequestFailure,
-                             "Retries exceeded.")
+                             'Retries exceeded.')
 
     def test_notify(self):
         result = self.proxy.notify('test_notify', 'foobar')
@@ -201,11 +201,11 @@ class TestJSONRPC:
 
     def test_wrong_id_fail(self):
         self.assertException('test_wrong_id_fail', JSONRPCRequestFailure,
-                             "Retries exceeded.")
+                             'Retries exceeded.')
 
     def test_bad_version(self):
         self.assertException('test_bad_version', JSONRPCBadResponse,
-                             "Bad jsonrpc version. Got 9000, expects 2.0")
+                             'Bad jsonrpc version. Got 9000, expects 2.0')
 
     def test_no_version_error(self):
         self.assertException('test_no_version_error', JSONRPCBadResponse,
@@ -213,15 +213,15 @@ class TestJSONRPC:
 
     def test_missing_comma(self):
         self.assertException('test_missing_comma', JSONRPCBadResponse,
-                             "Bad netstring: missing comma")
+                             'Bad netstring: missing comma')
 
     def test_error_no_code(self):
         self.assertException('test_error_no_code', JSONRPCBadResponse,
-                             "missing code")
+                             'missing code')
 
     def test_error_no_message(self):
         self.assertException('test_error_no_message', JSONRPCBadResponse,
-                             "missing message")
+                             'missing message')
 
     def test_error(self):
         try:
@@ -240,7 +240,7 @@ class TestJSONRPC:
         self.proxy.connect = connect
         self.proxy.socket = BadSocket()
         self.assertException('test_send_request_fail', JSONRPCRequestFailure,
-                             "Retries exceeded.")
+                             'Retries exceeded.')
 
     def test_send_notify_fail(self):
         def connect(self, *args):
@@ -249,7 +249,7 @@ class TestJSONRPC:
         self.proxy.connect = connect
         self.proxy.socket = BadSocket()
         self.assertException('test_send_notify_fail', JSONRPCRequestFailure,
-                             "Failed to send.", notify=True)
+                             'Failed to send.', notify=True)
 
     def test_send_notify_retry(self):
         self.proxy.socket = BadSocket(self.proxy.socket)
