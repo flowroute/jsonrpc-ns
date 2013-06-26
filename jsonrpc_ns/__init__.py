@@ -1,1 +1,1 @@
-from jsonrpc import JSONRPCProxy
+from jsonrpc import *

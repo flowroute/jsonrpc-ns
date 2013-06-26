@@ -5,7 +5,11 @@ import logging
 
 
 class JSONRPCError(Exception):
-    pass
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
 
 
 class JSONRPCBadResponse(JSONRPCError):
@@ -120,6 +124,10 @@ class JSONRPCProxy:
             raise JSONRPCBadResponse("Missing 'id'")
 
         if response['id'] != rpcid:
+            logging.error(
+                "Wrong response id. Got {}, expects {}."
+                "Retrying...".format(
+                response['id'], self.rpcid))
             return self.request(method, params, retry-1)
 
         last_char = self.socket.recv(1)
@@ -132,11 +140,11 @@ class JSONRPCProxy:
         elif 'error' in response:
             error = response['error']
             if 'code' not in error:
-                raise JSONRPCBadResponse('error response missing code.'
+                raise JSONRPCBadResponse('error response missing code. '
                                          'Response: {}'
                                          .format(response))
             elif 'message' not in error:
-                raise JSONRPCBadResponse('error response missing message.'
+                raise JSONRPCBadResponse('error response missing message. '
                                          'Response: {}'
                                          .format(response))
             raise JSONRPCResponseError(response['error'])
