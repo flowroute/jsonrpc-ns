@@ -22,6 +22,11 @@ Usage
     jsonrpc.notify('notify_method', {'more': 'data'})
 
 
+Tests
+-----
+
+    nosetests tests.py
+
 See Also
 -----
 [txjason](https://github.com/flowroute/txjason) for building high concurrency servers and clients on top of Twisted Python.
