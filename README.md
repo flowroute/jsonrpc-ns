@@ -4,7 +4,7 @@ jsonrpc-ns
 Description
 -----------
 
-jsonrpc-ns is a Lightweight JSON-RPC library for building TCP (Netstring) clients.
+jsonrpc-ns is a Lightweight JSON-RPC 2.0 library for building TCP (Netstring) clients.
 
 Installation
 ------------
@@ -25,6 +25,7 @@ Usage
 Tests
 -----
 
+    pip install nose
     nosetests tests.py
 
 See Also
