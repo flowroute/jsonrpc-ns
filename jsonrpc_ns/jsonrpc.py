@@ -2,6 +2,7 @@ import socket
 import json
 import traceback
 import logging
+from copy import copy
 
 
 class JSONRPCError(Exception):
@@ -29,7 +30,7 @@ class JSONRPCResponseError(JSONRPCError):
 
 class JSONRPCProxy:
 
-    def __init__(self, host, port, version='2.0', connect_timeout=60):
+    def __init__(self, host, port, version='2.0', connect_timeout=2):
         self.host = host
         self.port = port
         self.version = version
@@ -39,7 +40,7 @@ class JSONRPCProxy:
 
     @property
     def _rpcid(self):
-        if self._id > 1000000:
+        if self._id >= 1000000:
             self._id = 0
         self._id += 1
         return self._id
@@ -60,7 +61,7 @@ class JSONRPCProxy:
         }
 
         if notify is not True:
-            rpcid = self._rpcid
+            rpcid = copy(self._rpcid)
             jsonrpc['id'] = rpcid
 
         string = json.dumps(jsonrpc)
@@ -97,7 +98,12 @@ class JSONRPCProxy:
                 return do_retry(retry)
 
             while byte_length[-1] != ':':
-                byte_length += self.socket.recv(1)
+                c = self.socket.recv(1, socket.MSG_WAITALL)
+                if c not in '0123456789:':
+                    raise JSONRPCBadResponse('Bad netstring: '
+                                             'invalid length field, \'{}{}\''
+                                             .format(byte_length, c))
+                byte_length += c
 
             byte_length = int(byte_length[:-1])
 
@@ -108,6 +114,8 @@ class JSONRPCProxy:
                 response_string += str(self.socket.recv(remainder))
                 response_len = len(response_string)
             response = json.loads(response_string)
+        except JSONRPCBadResponse:
+            raise
         except Exception:
             # Get the traceback
             traceback_string = traceback.format_exc()
@@ -128,9 +136,9 @@ class JSONRPCProxy:
         if response['id'] != rpcid:
             logging.error(
                 'Wrong response id. Got {}, expects {}.'
-                'Retrying...'.format(
-                response['id'], self.rpcid))
-            return self.request(method, params, retry-1)
+                ' Retrying...'.format(
+                response['id'], rpcid))
+            return do_retry(retry)
 
         last_char = self.socket.recv(1)
 
@@ -151,7 +159,7 @@ class JSONRPCProxy:
                                          .format(response))
             raise JSONRPCResponseError(response['error'])
         else:
-            raise JSONRPCBadResponse('Unknown error. Response: {}'
+            raise JSONRPCBadResponse('Invalid response: {}'
                                      .format(response))
 
     def notify(self, method, params={}):

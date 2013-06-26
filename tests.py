@@ -50,6 +50,8 @@ class JSONRPCHandler(socketserver.BaseRequestHandler):
         # these values can be overridden
         is_error = False
         missing_comma = False
+        missing_length = False
+        invalid_resp = False
         version = '2.0'
         try:
             data = json.loads(jsdata)
@@ -61,7 +63,7 @@ class JSONRPCHandler(socketserver.BaseRequestHandler):
         method = data['method']
 
         if method == 'test_request':
-            result = 'pass'
+            result = data['params']
         elif method == 'test_request_fail':
             return
         elif method == 'test_no_id':
@@ -90,6 +92,9 @@ class JSONRPCHandler(socketserver.BaseRequestHandler):
         elif method == 'test_missing_comma':
             missing_comma = True
             result = 'fail'
+        elif method == 'test_missing_length':
+            missing_length = True
+            result = 'fail'
         elif method == 'test_error_no_code':
             is_error = True
             code = None
@@ -104,17 +109,22 @@ class JSONRPCHandler(socketserver.BaseRequestHandler):
             is_error = True
             code = 9000
             message = 'Failed'
+        elif method == 'test_invalid_response':
+            invalid_resp = True
 
         # construct response
-        if is_error is False:
-            respd = {'jsonrpc': version,
-                     'id': _id,
-                     'result': result}
+        if invalid_resp:
+            respd = {'jsonrpc': version, 'id': _id}
         else:
-            respd = {'jsonrpc': version,
-                     'id': _id,
-                     'error': {'code': code,
-                               'message': message}}
+            if is_error is False:
+                respd = {'jsonrpc': version,
+                         'id': _id,
+                         'result': result}
+            else:
+                respd = {'jsonrpc': version,
+                         'id': _id,
+                         'error': {'code': code,
+                                   'message': message}}
 
         if _id is None:
             respd.pop('id')
@@ -127,10 +137,12 @@ class JSONRPCHandler(socketserver.BaseRequestHandler):
                 respd['error'].pop('message')
 
         resps = json.dumps(respd)
-        if not missing_comma:
-            response = '{}:{},\n'.format(len(resps), resps)
+        if missing_comma:
+            response = '{}:{}'.format(len(resps), resps)
+        elif missing_length:
+            response = '{},'.format(resps)
         else:
-            response = '{}:{}\n'.format(len(resps), resps)
+            response = '{}:{},'.format(len(resps), resps)
 
         self.request.sendall(response)
 
@@ -149,14 +161,6 @@ class TestJSONRPC:
         self.server.shutdown()
         self.server.server_close()
 
-    @classmethod
-    def setup_class(cls):
-        print ('setup_class() before any methods in this class')
-
-    @classmethod
-    def teardown_class(cls):
-        print ('teardown_class() after any methods in this class')
-
     def assertException(self, name, _e, _str, notify=False):
         try:
             if not notify:
@@ -173,8 +177,16 @@ class TestJSONRPC:
         assert False
 
     def test_request(self):
-        result = self.proxy.request('test_request', 'foobar')
+        result = self.proxy.request('test_request', 'pass')
         assert (result == 'pass')
+
+    def test_request_multi(self):
+        result = self.proxy.request('test_request', 'pass1')
+        assert (result == 'pass1')
+        result = self.proxy.request('test_request', 'pass2')
+        assert (result == 'pass2')
+        result = self.proxy.request('test_request', 'pass3')
+        assert (result == 'pass3')
 
     def test_request_fail(self):
         self.assertException('test_request_fail', JSONRPCRequestFailure,
@@ -195,7 +207,7 @@ class TestJSONRPC:
                              "Missing 'jsonrpc' version")
 
     def test_wrong_id_retry(self):
-        self.proxy._id = 1
+        self.proxy._id = 0
         result = self.proxy.request('test_wrong_id_retry', 'foobar')
         assert (result == 'pass')
 
@@ -234,7 +246,7 @@ class TestJSONRPC:
         assert False
 
     def test_send_request_fail(self):
-        def connect(self, *args):
+        def connect():
             raise Exception('Failed to connect.')
 
         self.proxy.connect = connect
@@ -243,7 +255,7 @@ class TestJSONRPC:
                              'Retries exceeded.')
 
     def test_send_notify_fail(self):
-        def connect(self, *args):
+        def connect():
             raise Exception('Failed to connect.')
 
         self.proxy.connect = connect
@@ -258,3 +270,32 @@ class TestJSONRPC:
         time.sleep(0.001)  # to wait for threading
         assert self.server.got_notify
         self.server.got_notify = False
+
+    def test_id_wrap(self):
+        self.proxy._id = 1000000
+        result = self.proxy.request('test_request', 'pass')
+        assert (self.proxy._id == 1)
+        assert (result == 'pass')
+
+    def test_id_inc(self):
+        self.proxy._id = 0
+        result = self.proxy.request('test_request', 'pass1')
+        assert (result == 'pass1')
+        id0 = self.proxy._id
+        assert (id0 > 0)
+        result = self.proxy.request('test_request', 'pass2')
+        assert (result == 'pass2')
+        id1 = self.proxy._id
+        assert (id1 > id0)
+        result = self.proxy.request('test_request', 'pass3')
+        assert (result == 'pass3')
+        id2 = self.proxy._id
+        assert (id2 > id1)
+
+    def test_missing_length(self):
+        self.assertException('test_missing_length', JSONRPCBadResponse,
+                             'Bad netstring')
+
+    def test_invalid_response(self):
+        self.assertException('test_invalid_response', JSONRPCBadResponse,
+                             'Invalid response')
