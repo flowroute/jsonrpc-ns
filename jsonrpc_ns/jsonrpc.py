@@ -5,6 +5,25 @@ import logging
 
 
 class JSONRPCError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class JSONRPCBadResponse(JSONRPCError):
+    pass
+
+
+class JSONRPCRequestFailure(JSONRPCError):
+    pass
+
+
+class JSONRPCResponseError(JSONRPCError):
+    """
+    JSONRPCResponseError contains a dictionary with a code and a message
+    """
     pass
 
 
@@ -57,7 +76,7 @@ class JSONRPCProxy:
         def do_retry(retry):
             retry -= 1
             if retry < 0:
-                raise JSONRPCError("Retries exceeded. Request failed.")
+                raise JSONRPCRequestFailure("Retries exceeded.")
 
             self.close()
             try:
@@ -96,30 +115,44 @@ class JSONRPCProxy:
             return do_retry(retry)
 
         if not 'jsonrpc' in response:
-            raise JSONRPCError("Missing 'jsonrpc' version")
+            raise JSONRPCBadResponse("Missing 'jsonrpc' version")
 
         if response['jsonrpc'] != self.version:
-            raise JSONRPCError(
+            raise JSONRPCBadResponse(
                 "Bad jsonrpc version. Got {}, expects {}".format(
                     response['jsonrpc'], self.version))
 
         if not 'id' in response:
-            raise JSONRPCError("Missing 'id'")
+            raise JSONRPCBadResponse("Missing 'id'")
 
         if response['id'] != rpcid:
+            logging.error(
+                "Wrong response id. Got {}, expects {}."
+                "Retrying...".format(
+                response['id'], self.rpcid))
             return self.request(method, params, retry-1)
 
         last_char = self.socket.recv(1)
 
         if last_char != ',':
-            raise JSONRPCError("Bad netstring: missing comma")
+            raise JSONRPCBadResponse("Bad netstring: missing comma")
 
         if 'result' in response:
             return response['result']
         elif 'error' in response:
-            raise JSONRPCError(response['error'])
+            error = response['error']
+            if 'code' not in error:
+                raise JSONRPCBadResponse('error response missing code. '
+                                         'Response: {}'
+                                         .format(response))
+            elif 'message' not in error:
+                raise JSONRPCBadResponse('error response missing message. '
+                                         'Response: {}'
+                                         .format(response))
+            raise JSONRPCResponseError(response['error'])
         else:
-            raise JSONRPCError('Unknown error. Response: {}'.format(response))
+            raise JSONRPCBadResponse('Unknown error. Response: {}'
+                                     .format(response))
 
     def notify(self, method, params={}):
         netstring = self._msg(method, params, notify=True)
@@ -132,4 +165,4 @@ class JSONRPCProxy:
                 self.connect()
                 self.socket.sendall(netstring)
             except Exception:
-                raise JSONRPCError("Failed to send.")
+                raise JSONRPCRequestFailure("Failed to send.")
