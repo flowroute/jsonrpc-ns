@@ -16,7 +16,7 @@ Prerequisites:
 Usage
 -----
 
-    from jsonprc_ns import JSONRPCProxy
+    from jsonrpc_ns import JSONRPCProxy
     jsonrpc = JSONRPCProxy('some.jsonrpc.server.internal', 7080)
     jsonrpc.request('request_method', {'some': 'data'})
     jsonrpc.notify('notify_method', {'more': 'data'})
