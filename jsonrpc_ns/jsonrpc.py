@@ -32,7 +32,7 @@ class JSONRPCProxy:
 
     def __init__(self, host, port, version='2.0', connect_timeout=2):
         self.host = host
-        self.port = port
+        self.port = int(port)
         self.version = version
         self._id = 1
         self.timeout = connect_timeout
