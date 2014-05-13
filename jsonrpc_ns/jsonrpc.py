@@ -5,6 +5,30 @@ import logging
 from copy import copy
 
 
+def request(addr, method, data, timeout=None):
+    '''Simple single function interface
+    for JSON-RPC request that
+    creates and destroys a socket for every request.
+    '''
+    host, port = addr.split(':')
+    jsrpc = JSONRPCProxy(host, port, connect_timeout=timeout)
+    r = jsrpc.request(method, data, timeout=timeout)
+    jsrpc.close()
+    return r
+
+
+def notify(addr, method, data):
+    '''Simple single function interface
+    for JSON-RPC notify that
+    creates and destroys a socket for every request.
+    '''
+    host, port = addr.split(':')
+    jsrpc = JSONRPCProxy(host, port)
+    r = jsrpc.notify(method, data)
+    jsrpc.close()
+    return r
+
+
 class JSONRPCError(Exception):
     def __init__(self, value):
         self.value = value
@@ -72,7 +96,7 @@ class JSONRPCProxy:
         else:
             return (rpcid, netstring)
 
-    def request(self, method, params={}, retry=1):
+    def request(self, method, params={}, retry=1, timeout=2):
 
         def do_retry(retry):
             retry -= 1
@@ -82,7 +106,7 @@ class JSONRPCProxy:
             self.close()
             try:
                 self.connect()
-            except Exception:
+            except:
                 traceback_string = traceback.format_exc()
                 logging.error(traceback_string)
             return self.request(method, params, retry-1)
@@ -91,53 +115,59 @@ class JSONRPCProxy:
             rpcid, netstring = self._msg(method, params)
 
             self.socket.sendall(netstring)
-
-            byte_length = self.socket.recv(1, socket.MSG_WAITALL)
-
-            if not byte_length:
-                return do_retry(retry)
-
-            while byte_length[-1] != ':':
-                c = self.socket.recv(1, socket.MSG_WAITALL)
-                if c not in '0123456789:':
-                    raise JSONRPCBadResponse('Bad netstring: '
-                                             'invalid length field, \'{}{}\''
-                                             .format(byte_length, c))
-                byte_length += c
-
-            byte_length = int(byte_length[:-1])
-
-            response_string = ''
-            response_len = 0
-            while response_len < byte_length:
-                remainder = byte_length - response_len
-                response_string += str(self.socket.recv(remainder))
-                response_len = len(response_string)
-            response = json.loads(response_string)
-        except JSONRPCBadResponse:
-            raise
-        except Exception:
+        except:
             # Get the traceback
-            traceback_string = traceback.format_exc()
-            logging.error(traceback_string)
+            tb_s = traceback.format_exc()
+            logging.error(tb_s)
             return do_retry(retry)
 
-        if not 'jsonrpc' in response:
+        byte_length = self.socket.recv(1, socket.MSG_WAITALL)
+
+        if not byte_length:
+            raise JSONRPCError('Failed to recieve response.')
+
+        while byte_length[-1] != ':':
+            c = self.socket.recv(1, socket.MSG_WAITALL)
+            if c not in '0123456789:':
+                raise JSONRPCBadResponse(
+                    'Bad netstring: invalid length field, \'{0}{1}\''
+                    .format(byte_length, c))
+            byte_length += c
+
+        byte_length = int(byte_length[:-1])
+
+        response_string = ''
+        response_len = 0
+        while response_len < byte_length:
+            remainder = byte_length - response_len
+            response_string += str(self.socket.recv(remainder))
+            response_len = len(response_string)
+
+        try:
+            response = json.loads(response_string)
+        except:
+            raise JSONRPCBadResponse(
+                'Failed to parse response: {}'.format(response_string))
+
+        if 'jsonrpc' not in response:
             raise JSONRPCBadResponse("Missing 'jsonrpc' version")
 
         if response['jsonrpc'] != self.version:
             raise JSONRPCBadResponse(
-                'Bad jsonrpc version. Got {}, expects {}'.format(
-                    response['jsonrpc'], self.version))
+                'Bad jsonrpc version. Got {actual}, expects {expected}'
+                .format(
+                    actual=response['jsonrpc'],
+                    expected=self.version))
 
-        if not 'id' in response:
+        if 'id' not in response:
             raise JSONRPCBadResponse("Missing 'id'")
 
         if response['id'] != rpcid:
             logging.error(
-                'Wrong response id. Got {}, expects {}.'
+                'Wrong response id. Got {actual}, expects {expected}.'
                 ' Retrying...'.format(
-                response['id'], rpcid))
+                    actual=response['id'],
+                    expected=rpcid))
             return do_retry(retry)
 
         last_char = self.socket.recv(1)
@@ -150,17 +180,17 @@ class JSONRPCProxy:
         elif 'error' in response:
             error = response['error']
             if 'code' not in error:
-                raise JSONRPCBadResponse('error response missing code. '
-                                         'Response: {}'
-                                         .format(response))
+                raise JSONRPCBadResponse(
+                    'error response missing code. Response: {}'
+                    .format(response))
             elif 'message' not in error:
-                raise JSONRPCBadResponse('error response missing message. '
-                                         'Response: {}'
-                                         .format(response))
+                raise JSONRPCBadResponse(
+                    'error response missing message. Response: {}'
+                    .format(response))
             raise JSONRPCResponseError(response['error'])
         else:
-            raise JSONRPCBadResponse('Invalid response: {}'
-                                     .format(response))
+            raise JSONRPCBadResponse(
+                'Invalid response: {}'.format(response))
 
     def notify(self, method, params={}):
         netstring = self._msg(method, params, notify=True)
