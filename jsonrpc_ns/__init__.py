@@ -1,1 +1,1 @@
-from jsonrpc import *  # NOQA
+from .jsonrpc import *  # NOQA
