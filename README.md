@@ -25,7 +25,7 @@ Usage
 Tests
 -----
 
-    pip install nose
+    pip install pynose
     nosetests tests.py
 
 See Also
