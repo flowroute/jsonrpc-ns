@@ -101,6 +101,8 @@ class JSONRPCProxy:
         def do_retry(retry):
             retry -= 1
             if retry < 0:
+                # we're done; close socket
+                self.close()
                 raise JSONRPCRequestFailure('Retries exceeded.')
 
             self.close()

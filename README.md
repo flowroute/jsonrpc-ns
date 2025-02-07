@@ -11,7 +11,7 @@ Installation
 
 Prerequisites:
 
- * Python (Tested on 2.7)
+ * Python 3 (Tested on 3.11+)
 
 Usage
 -----
