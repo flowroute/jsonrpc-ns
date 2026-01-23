@@ -11,7 +11,7 @@ Installation
 
 Prerequisites:
 
- * Python (Tested on 2.7)
+ * Python 3 (Tested on 3.11+)
 
 Usage
 -----
@@ -25,7 +25,7 @@ Usage
 Tests
 -----
 
-    pip install nose
+    pip install pynose
     nosetests tests.py
 
 See Also

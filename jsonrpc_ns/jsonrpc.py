@@ -101,6 +101,8 @@ class JSONRPCProxy:
         def do_retry(retry):
             retry -= 1
             if retry < 0:
+                # we're done; close socket
+                self.close()
                 raise JSONRPCRequestFailure('Retries exceeded.')
 
             self.close()
@@ -114,20 +116,20 @@ class JSONRPCProxy:
         try:
             rpcid, netstring = self._msg(method, params)
 
-            self.socket.sendall(netstring)
+            self.socket.sendall(netstring.encode())
         except:
             # Get the traceback
             tb_s = traceback.format_exc()
             logging.error(tb_s)
             return do_retry(retry)
 
-        byte_length = self.socket.recv(1, socket.MSG_WAITALL)
+        byte_length = self.socket.recv(1, socket.MSG_WAITALL).decode()
 
         if not byte_length:
             raise JSONRPCError('Failed to recieve response.')
 
         while byte_length[-1] != ':':
-            c = self.socket.recv(1, socket.MSG_WAITALL)
+            c = self.socket.recv(1, socket.MSG_WAITALL).decode()
             if c not in '0123456789:':
                 raise JSONRPCBadResponse(
                     'Bad netstring: invalid length field, \'{0}{1}\''
@@ -140,7 +142,7 @@ class JSONRPCProxy:
         response_len = 0
         while response_len < byte_length:
             remainder = byte_length - response_len
-            response_string += str(self.socket.recv(remainder))
+            response_string += str(self.socket.recv(remainder).decode())
             response_len = len(response_string)
 
         try:
@@ -170,11 +172,10 @@ class JSONRPCProxy:
                     expected=rpcid))
             return do_retry(retry)
 
-        last_char = self.socket.recv(1)
+        last_char = self.socket.recv(1).decode()
 
         if last_char != ',':
             raise JSONRPCBadResponse('Bad netstring: missing comma')
-
         if 'result' in response:
             return response['result']
         elif 'error' in response:
@@ -195,12 +196,12 @@ class JSONRPCProxy:
     def notify(self, method, params={}):
         netstring = self._msg(method, params, notify=True)
         try:
-            self.socket.sendall(netstring)
+            self.socket.sendall(netstring.encode())
         except Exception:
             self.close()
             try:
                 # Retry once
                 self.connect()
-                self.socket.sendall(netstring)
+                self.socket.sendall(netstring.encode())
             except Exception:
                 raise JSONRPCRequestFailure('Failed to send.')
